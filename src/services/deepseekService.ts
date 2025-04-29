@@ -14,7 +14,7 @@ export const createCompletion = async (message: string) => {
         { role: "system", content: "You are a knowledgeable health coach." },
         { role: "user", content: message },
       ],
-      model: "deepseek-chat",
+      model: `${process.env.DEEPSEEK_MODEL}`,
     })
 
     return completion.choices[0].message.content
