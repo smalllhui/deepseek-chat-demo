@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "sourceMap": true,
+    "outDir": "build",
+    "rootDir": "src/",
+    "allowSyntheticDefaultImports": true,
+    "strict": true,
+    "target": "es6",
+    "lib": [
+      "dom",
+      "esnext"
+    ],
+    "moduleResolution": "Node",
+    "esModuleInterop": true,
+    "module": "CommonJS",
+    // 解析非相对模块名的基准目录
+    "baseUrl": ".",
+    // 模块名到基于 baseUrl的路径映射的列表。
+    "paths": {
+      "@/*": [
+        "src/*"
+      ]
+    }
+  }
+}

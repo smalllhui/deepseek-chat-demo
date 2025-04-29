@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DeepSeek 聊天演示-基于流</title>
+<script type="module">
+  // 通过 CDN 引入EventSource（ESM 格式）
+  import { fetchEventSource } from 'https://cdn.jsdelivr.net/npm/@fortaine/fetch-event-source@3.0.6/+esm'
+  Window.fetchEventSource = fetchEventSource // 挂载到Window上
+</script>
+<!-- Markdown 渲染库 -->
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<!-- 代码高亮库 官方 CDN -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<style>
+  :root {
+    --primary-color: #2d8cf0;
+    --bot-bg: #f5f5f5;
+    --user-bg: #e6f7ff;
+  }
+
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #f8f9fa;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .chat-container {
+    max-width: 800px;
+    margin: 20px auto;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    width: 95%;
+  }
+
+  .messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+  }
+
+  .message {
+    max-width: 80%;
+    padding: 12px 16px;
+    border-radius: 15px;
+    line-height: 1.5;
+    animation: fadeIn 0.3s ease;
+  }
+
+  .bot-message {
+    background: var(--bot-bg);
+    align-self: flex-start;
+    border-bottom-left-radius: 3px;
+  }
+
+  .user-message {
+    background: var(--user-bg);
+    align-self: flex-end;
+    border-bottom-right-radius: 3px;
+  }
+
+  .typing-indicator {
+    display: none;
+    padding: 12px;
+    color: #666;
+    font-style: italic;
+  }
+
+  .input-container {
+    border-top: 1px solid #eee;
+    padding: 15px;
+    display: flex;
+    gap: 10px;
+  }
+
+  #messageInput {
+    flex: 1;
+    padding: 12px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 16px;
+    resize: none;
+    min-height: 48px;
+    max-height: 120px;
+  }
+
+  #sendButton {
+    padding: 0 20px;
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: opacity 0.2s;
+  }
+
+  #sendButton:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .stop {
+    align-items: center;
+    display: flex;
+    cursor: pointer;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @media (max-width: 480px) {
+    .message {
+      max-width: 90%;
+    }
+  }
+</style>
+</head>
+
+<body>
+  <div class="chat-container">
+    <div class="messages" id="messages"></div>
+    <div class="typing-indicator" id="typing">DeepSeek 正在输入...</div>
+    <div class="input-container">
+      <textarea id="messageInput" placeholder="输入消息..." rows="1" @keydown="handleKeyDown"></textarea>
+      <!-- sendMessageByFetch() sendMessageByEventSource() -->
+      <button id="sendButton" onclick="sendMessageByEventSource()">发送</button>
+      <span class="stop" onclick="cancelRequest()">🟥</span>
+    </div>
+  </div>
+
+  <script>
+    let ctrl; // 用于中断请求
+
+    const messagesEl = document.getElementById('messages');
+    const inputEl = document.getElementById('messageInput');
+    inputEl.value = "写一个冒泡排序" // 给input赋初始值
+    const sendBtn = document.getElementById('sendButton');
+    const typingEl = document.getElementById('typing');
+
+    // 自动调整输入框高度
+    inputEl.addEventListener('input', () => {
+      inputEl.style.height = 'auto';
+      inputEl.style.height = inputEl.scrollHeight + 'px';
+    });
+
+    // 添加消息到聊天框
+    function addMessage(content, isUser) {
+      const messageDiv = document.createElement('div');
+      messageDiv.className = `message ${isUser ? 'user-message' : 'bot-message'}`;
+      messageDiv.textContent = content;
+      messagesEl.appendChild(messageDiv);
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    // 通过fetch发送消息到后端 并且接收后端返回的流数据
+    async function sendMessageByFetch() {
+      const content = inputEl.value.trim();
+      if (!content || sendBtn.disabled) return;
+
+      // 清空输入框
+      inputEl.value = '';
+      inputEl.style.height = 'auto';
+      sendBtn.disabled = true;
+
+      // 添加用户消息
+      addMessage(content, true);
+
+      // 显示正在输入提示
+      typingEl.style.display = 'block';
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+      console.log("用户请求数据:", content)
+      ctrl = new AbortController()
+      try {
+        // 调用后端流式API 
+        const response = await fetch('http://127.0.0.1:4000/api/ai/chat-stream-deepseek', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            message: content
+          }),
+          signal: ctrl.signal,
+        })
+
+        // 处理流式数据
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let botResponse = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          const chunk = decoder.decode(value);
+          const lines = chunk.split('\n').filter(l => l.trim());
+          for (const line of lines) {
+            const message = line.replace(/^data: /, '');
+            if (message === '[DONE]') break;
+            try {
+              const data = JSON.parse(message);
+              botResponse += data.content;
+              // 实时更新 UI(如逐词显示)
+              const lastMsg = messagesEl.lastChild;
+              if (lastMsg && !lastMsg.classList.contains('user-message')) {
+                lastMsg.innerHTML = marked.parse(botResponse)
+                hljs.highlightAll(); // 重新高亮代码块
+              } else {
+                addMessage(marked.parse(botResponse), false);
+              }
+              messagesEl.scrollTop = messagesEl.scrollHeight;
+            } catch (e) {
+              console.error('解析错误:', e);
+            }
+          }
+        }
+      } catch (error) {
+        if (!error.name === 'AbortError') // 自己点击中断
+          addMessage(`请求失败: ${error.message}`, false);
+      } finally {
+        typingEl.style.display = 'none';
+        sendBtn.disabled = false;
+      }
+    }
+
+    // 通过EventSource发送消息到后端 并且接收后端返回的流数据
+    async function sendMessageByEventSource() {
+      const content = inputEl.value.trim();
+      if (!content || sendBtn.disabled) return;
+
+      // 清空输入框
+      inputEl.value = '';
+      inputEl.style.height = 'auto';
+      sendBtn.disabled = true;
+
+      // 添加用户消息
+      addMessage(content, true);
+
+      // 显示正在输入提示
+      typingEl.style.display = 'block';
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+
+      console.log("用户请求数据:", content)
+      ctrl = new AbortController()
+      let botResponse = '';//返回数据
+      // 创建 EventSource 实例（支持 POST）
+      Window.fetchEventSource('http://127.0.0.1:4000/api/ai/chat-stream-deepseek', {
+        method: 'POST',       // 使用 POST 方法
+        headers: {
+          'Content-Type': 'application/json',  // 请求头
+        },
+        body: JSON.stringify({
+          message: content
+        }), // POST 数据
+        signal: ctrl.signal,// 绑定中断信号
+        onopen: async (response) => {
+          // 连接成功时触发
+          console.log('SSE 连接已建立，状态码:', response.status);
+          if (response.ok) return;         // 正常情况继续处理
+          throw new Error('连接失败');
+        },
+        onmessage: (event) => {
+          // 收到服务器消息时触发
+          console.log('收到事件:', event.data);
+          const data = JSON.parse(event.data)
+          botResponse += data.content;
+          // 实时更新 UI(如逐词显示)
+          const lastMsg = messagesEl.lastChild;
+          if (lastMsg && !lastMsg.classList.contains('user-message')) {
+            lastMsg.innerHTML = marked.parse(botResponse)
+            hljs.highlightAll(); // 重新高亮代码块
+          } else {
+            addMessage(marked.parse(botResponse), false);
+          }
+          messagesEl.scrollTop = messagesEl.scrollHeight;
+        },
+        onerror: (err) => {
+          // 发生错误时触发（自动重试）
+          console.error('SSE 错误:', err);
+          addMessage(`请求失败`, false);
+          throw err; // 抛出错误停止重试
+        },
+        onclose: () => {
+          // 连接关闭时触发
+          console.log('SSE 连接已关闭');
+          typingEl.style.display = 'none';
+          sendBtn.disabled = false;
+        }
+      });
+    }
+
+    // 取消请求
+    function cancelRequest() {
+      if (!ctrl) {
+        return
+      }
+      console.log("取消请求")
+      ctrl.abort();
+      typingEl.style.display = 'none';
+      sendBtn.disabled = false;
+    }
+  </script>
+</body>
+
+</html>

@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Markdown 渲染库 -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <!-- 代码高亮库 官方 CDN -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <title>DeepSeek 聊天演示-基于文本</title>
+  <style>
+    :root {
+      --primary-color: #2d8cf0;
+      --bot-bg: #f5f5f5;
+      --user-bg: #e6f7ff;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f8f9fa;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .chat-container {
+      max-width: 800px;
+      margin: 20px auto;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      width: 95%;
+    }
+
+    .messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+
+    .message {
+      max-width: 80%;
+      padding: 12px 16px;
+      border-radius: 15px;
+      line-height: 1.5;
+      animation: fadeIn 0.3s ease;
+    }
+
+    .bot-message {
+      background: var(--bot-bg);
+      align-self: flex-start;
+      border-bottom-left-radius: 3px;
+    }
+
+    .user-message {
+      background: var(--user-bg);
+      align-self: flex-end;
+      border-bottom-right-radius: 3px;
+    }
+
+    .typing-indicator {
+      display: none;
+      padding: 12px;
+      color: #666;
+      font-style: italic;
+    }
+
+    .input-container {
+      border-top: 1px solid #eee;
+      padding: 15px;
+      display: flex;
+      gap: 10px;
+    }
+
+    #messageInput {
+      flex: 1;
+      padding: 12px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      font-size: 16px;
+      resize: none;
+      min-height: 48px;
+      max-height: 120px;
+    }
+
+    #sendButton {
+      padding: 0 20px;
+      background: var(--primary-color);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+
+    #sendButton:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @media (max-width: 480px) {
+      .message {
+        max-width: 90%;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="chat-container">
+    <div class="messages" id="messages"></div>
+    <div class="typing-indicator" id="typing">DeepSeek 正在生成中...</div>
+    <div class="input-container">
+      <textarea id="messageInput" placeholder="输入消息..." rows="1" @keydown="handleKeyDown"></textarea>
+      <button id="sendButton" onclick="sendMessage()">发送</button>
+    </div>
+  </div>
+</body>
+
+<script>
+  const messagesEl = document.getElementById('messages');
+  const inputEl = document.getElementById('messageInput');
+  inputEl.value = "写一个冒泡排序" // 给input赋初始值
+  const sendBtn = document.getElementById('sendButton');
+  const typingEl = document.getElementById('typing');
+
+  // 自动调整输入框高度
+  inputEl.addEventListener('input', () => {
+    inputEl.style.height = 'auto';
+    inputEl.style.height = inputEl.scrollHeight + 'px';
+  });
+
+  // 添加消息到聊天框
+  function addMessage(content, isUser) {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `message ${isUser ? 'user-message' : 'bot-message'}`;
+    messageDiv.innerHTML = marked.parse(content);
+    messagesEl.appendChild(messageDiv);
+    hljs.highlightAll(); // 重新高亮代码块
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+
+  // 发送消息到后端
+  async function sendMessage() {
+    const content = inputEl.value.trim();
+    if (!content || sendBtn.disabled) return;
+
+    // 清空输入框
+    inputEl.value = '';
+    inputEl.style.height = 'auto';
+    sendBtn.disabled = true;
+
+    // 添加用户消息
+    addMessage(content, true);
+
+    // 显示【DeepSeek 正在输入.】
+    typingEl.style.display = 'block';
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+
+    try {
+      // 调用后端API
+      const response = await fetch('http://127.0.0.1:4000/api/ai/chat-deepseek', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          message: content
+        })
+      }).then(response => response.json()) // 解析响应为JSON
+      console.log("返回数据:", response.data)
+      addMessage(response.data, false);
+    } catch (error) {
+      addMessage(`请求失败: ${error.message}`, false);
+    } finally {
+      typingEl.style.display = 'none';
+      sendBtn.disabled = false;
+    }
+  }
+</script>
+
+</html>

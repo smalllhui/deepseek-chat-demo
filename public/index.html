@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DeepSeek效果模拟</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+      font-family: 'Segoe UI', sans-serif;
+    }
+
+    .portal-container {
+      display: flex;
+      flex-direction: column;
+      gap: 2rem;
+    }
+
+    .portal-button {
+      position: relative;
+      padding: 1.5rem 3rem;
+      font-size: 1.2rem;
+      text-decoration: none;
+      color: white;
+      border-radius: 15px;
+      overflow: hidden;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    }
+
+    .portal-button::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(45deg, #6b48ff, #00a8ff);
+      z-index: -1;
+      transition: opacity 0.3s ease;
+    }
+
+    .portal-button:nth-child(2)::before {
+      background: linear-gradient(45deg, #ff6b6b, #ff9a44);
+    }
+
+    .portal-button:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+    }
+
+    .portal-button:hover::before {
+      opacity: 0.9;
+    }
+
+    .button-text {
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+    }
+
+    .button-icon {
+      width: 24px;
+      height: 24px;
+      fill: currentColor;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="portal-container">
+    <a href="/基于流.html" class="portal-button">
+      <span class="button-text">
+        <svg class="button-icon" viewBox="0 0 24 24">
+          <path
+            d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.94-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z" />
+        </svg>
+        流式上屏
+      </span>
+    </a>
+
+    <a href="/基于文本.html" class="portal-button">
+      <span class="button-text">
+        <svg class="button-icon" viewBox="0 0 24 24">
+          <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
+        </svg>
+        文本上屏
+      </span>
+    </a>
+  </div>
+</body>
+
+</html>
